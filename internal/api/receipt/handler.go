@@ -5,20 +5,16 @@ import (
 	"net/http"
 )
 
-type IDResponse struct {
-	ID string `json:"id"`
-}
-
-type PointsResponse struct {
-	Points int64 `json:"points"`
-}
-
 type Handler struct {
 	service Service
 }
 
 func NewHandler(service Service) *Handler {
 	return &Handler{service: service}
+}
+
+type PointsResponse struct {
+	Points int64 `json:"points"`
 }
 
 func (h *Handler) Points(w http.ResponseWriter, r *http.Request) {
@@ -30,10 +26,14 @@ func (h *Handler) Points(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(PointsResponse{points})
 }
 
-func (h *Handler) SetPoints(w http.ResponseWriter, r *http.Request) {
+type ProcessResponse struct {
+	ID string `json:"id"`
+}
+
+func (h *Handler) Process(w http.ResponseWriter, r *http.Request) {
 	id := h.service.SetPoints()
 
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
-	json.NewEncoder(w).Encode(IDResponse{id})
+	json.NewEncoder(w).Encode(ProcessResponse{id})
 }

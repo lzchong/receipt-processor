@@ -36,18 +36,18 @@ func TestReceiptHandler(t *testing.T) {
 		assertJSONResponse(t, response, PointsResponse{32})
 	})
 
-	t.Run("set points", func(t *testing.T) {
+	t.Run("process", func(t *testing.T) {
 		request, err := http.NewRequest("POST", "/receipts/process", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		response := httptest.NewRecorder()
-		handler.SetPoints(response, request)
+		handler.Process(response, request)
 
 		assertStatus(t, response.Code, http.StatusAccepted)
 		assertContentType(t, response, "application/json")
-		assertJSONResponse(t, response, IDResponse{"7fb1377b-b223-49d9-a31a-5a02701dd310"})
+		assertJSONResponse(t, response, ProcessResponse{"7fb1377b-b223-49d9-a31a-5a02701dd310"})
 	})
 }
 

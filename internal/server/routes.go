@@ -11,7 +11,7 @@ func NewRouter() http.Handler {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /receipts/{id}/points", receiptHandler.Points)
-	mux.HandleFunc("POST /receipts/process", receiptHandler.SetPoints)
+	mux.HandleFunc("POST /receipts/process", receiptHandler.Process)
 
 	return mux
 }
