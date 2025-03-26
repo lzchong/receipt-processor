@@ -10,6 +10,10 @@ func TestServer(t *testing.T) {
 	router := http.NewServeMux()
 	server := NewServer(router)
 
+	t.Cleanup(func() {
+		server.Close()
+	})
+
 	assertEqual(t, "server address", server.Addr, ":8080")
 	assertEqual(t, "read timeout", server.ReadTimeout, 10*time.Second)
 	assertEqual(t, "read header timeout", server.ReadHeaderTimeout, 2*time.Second)
