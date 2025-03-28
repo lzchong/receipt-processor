@@ -20,146 +20,151 @@ func TestCalculatePoints(t *testing.T) {
 			Total: 35.35,
 		}
 
-		got := receipt.CalculatePoints()
-		assertEqual(t, "points", got, 28)
+		if got, want := receipt.CalculatePoints(), int64(28); got != want {
+			t.Errorf("expected points %v, but got %v", want, got)
+		}
 	})
 }
 
 func TestCountByAlphanumericCharacter(t *testing.T) {
-	t.Run("return 14 for M&M Corner Market", func(t *testing.T) {
-		got := countByAlphanumericCharacter("M&M Corner Market")
-		assertEqual(t, "count", got, 14)
-	})
+	tests := map[string]struct {
+		input    string
+		expected int64
+	}{
+		"M&M Corner Market": {"M&M Corner Market", 14},
+		"empty string":      {"", 0},
+	}
 
-	t.Run("return 0 for empty string", func(t *testing.T) {
-		got := countByAlphanumericCharacter("")
-		assertEqual(t, "count", got, 0)
-	})
-}
-
-func TestIsRoundDollarAmount(t *testing.T) {
-	t.Run("return true for 0.00", func(t *testing.T) {
-		got := isRoundDollarAmount(0.00)
-		assertTrue(t, got)
-	})
-
-	t.Run("return false for 0.01", func(t *testing.T) {
-		got := isRoundDollarAmount(0.01)
-		assertFalse(t, got)
-	})
-
-	t.Run("return false for 0.99", func(t *testing.T) {
-		got := isRoundDollarAmount(0.99)
-		assertFalse(t, got)
-	})
-
-	t.Run("return false for 1.00", func(t *testing.T) {
-		got := isRoundDollarAmount(1.00)
-		assertTrue(t, got)
-	})
-}
-
-func TestIsMultipleOfQuarter(t *testing.T) {
-	t.Run("return true for 0.00", func(t *testing.T) {
-		got := isMultipleOfQuarter(0.00)
-		assertTrue(t, got)
-	})
-
-	t.Run("return true for 5.75", func(t *testing.T) {
-		got := isMultipleOfQuarter(5.75)
-		assertTrue(t, got)
-	})
-
-	t.Run("return false for 25.01", func(t *testing.T) {
-		got := isMultipleOfQuarter(25.01)
-		assertFalse(t, got)
-	})
-}
-
-func TestCountEveryTwoItems(t *testing.T) {
-	t.Run("return 1 for two items", func(t *testing.T) {
-		got := countEveryTwoItems([]ReceiptItem{{"", 0}, {"", 0}})
-		assertEqual(t, "count", got, 1)
-	})
-
-	t.Run("return 0 for one item", func(t *testing.T) {
-		got := countEveryTwoItems([]ReceiptItem{{"", 0}})
-		assertEqual(t, "count", got, 0)
-	})
-
-	t.Run("return 0 for no item", func(t *testing.T) {
-		got := countEveryTwoItems([]ReceiptItem{})
-		assertEqual(t, "count", got, 0)
-	})
-}
-
-func TestIsStringLengthMultipleOfThree(t *testing.T) {
-	t.Run("return true for 3 characters", func(t *testing.T) {
-		got := isStringLengthMultipleOfThree("abc")
-		assertTrue(t, got)
-	})
-
-	t.Run("return false for 4 characters", func(t *testing.T) {
-		got := isStringLengthMultipleOfThree("abcd")
-		assertFalse(t, got)
-	})
-
-	t.Run("return true for 0 character", func(t *testing.T) {
-		got := isStringLengthMultipleOfThree("")
-		assertTrue(t, got)
-	})
-}
-
-func TestIsOddDay(t *testing.T) {
-	t.Run("return true if day is 1", func(t *testing.T) {
-		d, _ := time.Parse(time.DateOnly, "2024-01-01")
-		got := isOddDay(d)
-		assertTrue(t, got)
-	})
-
-	t.Run("return false if day is 2", func(t *testing.T) {
-		d, _ := time.Parse(time.DateOnly, "2024-01-02")
-		got := isOddDay(d)
-		assertFalse(t, got)
-	})
-}
-
-func TestIsTimeBetweenTwoPMAndFourPM(t *testing.T) {
-	t.Run("return true if time is 2:00PM", func(t *testing.T) {
-		ti, _ := time.Parse("15:04", "14:00")
-		got := isTimeBetweenTwoPMAndFourPM(ti)
-		assertFalse(t, got)
-	})
-
-	t.Run("return true if time is 2:01PM", func(t *testing.T) {
-		ti, _ := time.Parse("15:04", "14:01")
-		got := isTimeBetweenTwoPMAndFourPM(ti)
-		assertTrue(t, got)
-	})
-
-	t.Run("return true if time is 3:59PM", func(t *testing.T) {
-		ti, _ := time.Parse("15:04", "15:59")
-		got := isTimeBetweenTwoPMAndFourPM(ti)
-		assertTrue(t, got)
-	})
-
-	t.Run("return false if time is 4:00PM", func(t *testing.T) {
-		ti, _ := time.Parse("15:04", "16:00")
-		got := isTimeBetweenTwoPMAndFourPM(ti)
-		assertFalse(t, got)
-	})
-}
-
-func assertTrue(t *testing.T, got bool) {
-	t.Helper()
-	if got != true {
-		t.Errorf("expected true, but got %t", got)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got, want := countByAlphanumericCharacter(test.input), test.expected; got != want {
+				t.Errorf("expected count %v, but got %v", want, got)
+			}
+		})
 	}
 }
 
-func assertFalse(t *testing.T, got bool) {
-	t.Helper()
-	if got != false {
-		t.Errorf("expected false, but got %t", got)
+func TestIsRoundDollarAmount(t *testing.T) {
+	tests := map[string]struct {
+		input    float64
+		expected bool
+	}{
+		"0.00": {0.00, true},
+		"0.01": {0.01, false},
+		"0.99": {0.99, false},
+		"1.00": {1.00, true},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got, want := isRoundDollarAmount(test.input), test.expected; got != want {
+				t.Errorf("expected %t, but got %t", want, got)
+			}
+		})
+	}
+}
+
+func TestIsMultipleOfQuarter(t *testing.T) {
+	tests := map[string]struct {
+		input    float64
+		expected bool
+	}{
+		"0.00":  {0.00, true},
+		"5.75":  {5.75, true},
+		"25.01": {25.01, false},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got, want := isMultipleOfQuarter(test.input), test.expected; got != want {
+				t.Errorf("expected %t, but got %t", want, got)
+			}
+		})
+	}
+}
+
+func TestCountEveryTwoItems(t *testing.T) {
+	tests := map[string]struct {
+		input    []ReceiptItem
+		expected int64
+	}{
+		"two items": {[]ReceiptItem{{"", 0}, {"", 0}}, 1},
+		"one item":  {[]ReceiptItem{{"", 0}}, 0},
+		"no item":   {[]ReceiptItem{}, 0},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got, want := countEveryTwoItems(test.input), test.expected; got != want {
+				t.Errorf("expected count %d, but got %d", want, got)
+			}
+		})
+	}
+}
+
+func TestIsStringLengthMultipleOfThree(t *testing.T) {
+	tests := map[string]struct {
+		input    string
+		expected bool
+	}{
+		"three characters": {"abc", true},
+		"four characters":  {"abcd", false},
+		"no character":     {"", true},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got, want := isStringLengthMultipleOfThree(test.input), test.expected; got != want {
+				t.Errorf("expected %t, but got %t", want, got)
+			}
+		})
+	}
+}
+
+func TestIsOddDay(t *testing.T) {
+	tests := map[string]struct {
+		input    int
+		expected bool
+	}{
+		"day 1": {1, true},
+		"day 2": {2, false},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			inputTime := time.Date(2024, time.January, test.input, 0, 0, 0, 0, time.UTC)
+			if got, want := isOddDay(inputTime), test.expected; got != want {
+				t.Errorf("expected %t, but got %t", want, got)
+			}
+		})
+	}
+}
+
+func TestIsTimeBetweenTwoPMAndFourPM(t *testing.T) {
+	tests := map[string]struct {
+		hour     int
+		min      int
+		expected bool
+	}{
+		"2:00 PM": {14, 0, false},
+		"2:01 PM": {14, 1, true},
+		"3:59 PM": {15, 59, true},
+		"4:00 PM": {16, 0, false},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			inputTime := time.Date(2024, time.January, 1, test.hour, test.min, 0, 0, time.UTC)
+			if got, want := isTimeBetweenTwoPMAndFourPM(inputTime), test.expected; got != want {
+				t.Errorf("expected %t, but got %t", want, got)
+			}
+		})
 	}
 }
