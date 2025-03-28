@@ -1,6 +1,7 @@
 package receipt
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -18,7 +19,7 @@ func (m *stubService) Points(id string) (int64, error) {
 	return 0, ErrReceiptNotFound
 }
 
-func (m *stubService) SetPoints() string {
+func (m *stubService) Process(receipt *Receipt) string {
 	return "7fb1377b-b223-49d9-a31a-5a02701dd310"
 }
 
@@ -90,12 +91,215 @@ func TestReceiptHandler_Points(t *testing.T) {
 	})
 }
 
+func TestReceiptHandler_ItemRequestValidation(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		receiptItem := &ItemRequest{"Mountain Dew 12PK", "6.49"}
+		err := receiptItem.Validate()
+		if err != nil {
+			t.Errorf("expected no error, but got %v", err)
+		}
+	})
+
+	t.Run("empty short description", func(t *testing.T) {
+		receiptItem := &ItemRequest{"", "6.49"}
+		err := receiptItem.Validate()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+	})
+
+	t.Run("invalid short description", func(t *testing.T) {
+		receiptItem := &ItemRequest{"Mountain&Dew 12PK", "6.49"}
+		err := receiptItem.Validate()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+	})
+
+	t.Run("price lower than zero", func(t *testing.T) {
+		receiptItem := &ItemRequest{"Mountain Dew 12PK", "-1"}
+		err := receiptItem.Validate()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+	})
+
+	t.Run("price in incorrect decimal places", func(t *testing.T) {
+		receiptItem := &ItemRequest{"Mountain Dew 12PK", "6.496"}
+		err := receiptItem.Validate()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+	})
+}
+
+func TestReceiptHandler_ProcessRequestValidation(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		receipt := &ProcessRequest{
+			Retailer:     "Target",
+			PurchaseDate: "2022-01-01",
+			PurchaseTime: "13:01",
+			Items:        []ItemRequest{{"Mountain Dew 12PK", "6.49"}},
+			Total:        "35.35",
+		}
+		err := receipt.Validate()
+		if err != nil {
+			t.Errorf("expected no error, but got %v", err)
+		}
+	})
+
+	t.Run("empty retailer", func(t *testing.T) {
+		receipt := &ProcessRequest{
+			Retailer:     "",
+			PurchaseDate: "2022-01-01",
+			PurchaseTime: "13:01",
+			Items:        []ItemRequest{{"Mountain Dew 12PK", "6.49"}},
+			Total:        "35.35",
+		}
+		err := receipt.Validate()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+	})
+
+	t.Run("empty purchase date", func(t *testing.T) {
+		receipt := &ProcessRequest{
+			Retailer:     "Target",
+			PurchaseDate: "",
+			PurchaseTime: "13:01",
+			Items:        []ItemRequest{{"Mountain Dew 12PK", "6.49"}},
+			Total:        "35.35",
+		}
+		err := receipt.Validate()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+	})
+
+	t.Run("invalid purchase date", func(t *testing.T) {
+		receipt := &ProcessRequest{
+			Retailer:     "Target",
+			PurchaseDate: "01-01-2022",
+			PurchaseTime: "13:01",
+			Items:        []ItemRequest{{"Mountain Dew 12PK", "6.49"}},
+			Total:        "35.35",
+		}
+		err := receipt.Validate()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+	})
+
+	t.Run("empty purchase time", func(t *testing.T) {
+		receipt := &ProcessRequest{
+			Retailer:     "Target",
+			PurchaseDate: "2022-01-01",
+			PurchaseTime: "",
+			Items:        []ItemRequest{{"Mountain Dew 12PK", "6.49"}},
+			Total:        "35.35",
+		}
+		err := receipt.Validate()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+	})
+
+	t.Run("invalid purchase time", func(t *testing.T) {
+		receipt := &ProcessRequest{
+			Retailer:     "Target",
+			PurchaseDate: "2022-01-01",
+			PurchaseTime: "13:01:32",
+			Items:        []ItemRequest{{"Mountain Dew 12PK", "6.49"}},
+			Total:        "35.35",
+		}
+		err := receipt.Validate()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+	})
+
+	t.Run("contains invalid item", func(t *testing.T) {
+		receipt := &ProcessRequest{
+			Retailer:     "Target",
+			PurchaseDate: "2022-01-01",
+			PurchaseTime: "13:01",
+			Items:        []ItemRequest{{"", "6.49"}},
+			Total:        "35.35",
+		}
+		err := receipt.Validate()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+	})
+
+	t.Run("no items", func(t *testing.T) {
+		receipt := &ProcessRequest{
+			Retailer:     "Target",
+			PurchaseDate: "2022-01-01",
+			PurchaseTime: "13:01",
+			Items:        []ItemRequest{},
+			Total:        "35.35",
+		}
+		err := receipt.Validate()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+	})
+
+	t.Run("total lower than zero", func(t *testing.T) {
+		receipt := &ProcessRequest{
+			Retailer:     "Target",
+			PurchaseDate: "2022-01-01",
+			PurchaseTime: "13:01",
+			Items:        []ItemRequest{{"Mountain Dew 12PK", "6.49"}},
+			Total:        "-1",
+		}
+		err := receipt.Validate()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+	})
+
+	t.Run("total in incorrect decimal places", func(t *testing.T) {
+		receipt := &ProcessRequest{
+			Retailer:     "Target",
+			PurchaseDate: "2022-01-01",
+			PurchaseTime: "13:01",
+			Items:        []ItemRequest{{"Mountain Dew 12PK", "6.49"}},
+			Total:        "35.353",
+		}
+		err := receipt.Validate()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+	})
+}
+
 func TestReceiptHandler_Process(t *testing.T) {
 	service := &stubService{}
 	handler := NewHandler(service)
 
-	t.Run("process", func(t *testing.T) {
-		request, err := http.NewRequest("POST", "/receipts/process", nil)
+	t.Run("success", func(t *testing.T) {
+		receipt := &ProcessRequest{
+			Retailer:     "Target",
+			PurchaseDate: "2022-01-01",
+			PurchaseTime: "13:01",
+			Items: []ItemRequest{
+				{"Mountain Dew 12PK", "6.49"},
+				{"Emils Cheese Pizza", "12.25"},
+				{"Knorr Creamy Chicken", "1.26"},
+				{"Doritos Nacho Cheese", "3.35"},
+				{"   Klarbrunn 12-PK 12 FL OZ  ", "12.00"},
+			},
+			Total: "35.35",
+		}
+
+		body, err := json.Marshal(receipt)
+		if err != nil {
+			t.Fatalf("failed to marshal receipt, %v", err)
+		}
+
+		request, err := http.NewRequest("POST", "/receipts/process", bytes.NewReader(body))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -106,6 +310,61 @@ func TestReceiptHandler_Process(t *testing.T) {
 		assertStatus(t, response, http.StatusAccepted)
 		assertContentType(t, response, "application/json")
 		assertJSONResponse(t, response, ProcessResponse{"7fb1377b-b223-49d9-a31a-5a02701dd310"})
+	})
+
+	t.Run("no request body", func(t *testing.T) {
+		request, err := http.NewRequest("POST", "/receipts/process", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		response := httptest.NewRecorder()
+		handler.Process(response, request)
+
+		assertStatus(t, response, http.StatusBadRequest)
+		assertHasError(t, response)
+	})
+
+	t.Run("malformed JSON", func(t *testing.T) {
+		body := `{retailer":"Target","purchaseDate":"2022-01-01","purchaseTime":"13:01","items":[{"shortDescription":"Mountain Dew 12PK","price":"6.49"}],"total":"6.49"}`
+		request, err := http.NewRequest("POST", "/receipts/process", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		response := httptest.NewRecorder()
+		handler.Process(response, request)
+
+		assertStatus(t, response, http.StatusBadRequest)
+		assertHasError(t, response)
+	})
+
+	t.Run("unexpected fields", func(t *testing.T) {
+		body := `{"extra-field":"some value","retailer":"Target","purchaseDate":"2022-01-01","purchaseTime":"13:01","items":[{"shortDescription":"Mountain Dew 12PK","price":"6.49"}],"total":"6.49"}`
+		request, err := http.NewRequest("POST", "/receipts/process", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		response := httptest.NewRecorder()
+		handler.Process(response, request)
+
+		assertStatus(t, response, http.StatusBadRequest)
+		assertHasError(t, response)
+	})
+
+	t.Run("invalid data types", func(t *testing.T) {
+		body := `{"retailer":"Target","purchaseDate":"2022-01-01","purchaseTime":"13:01","items":[{"shortDescription":"Mountain Dew 12PK","price":"6.49"}],"total":"price"}`
+		request, err := http.NewRequest("POST", "/receipts/process", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		response := httptest.NewRecorder()
+		handler.Process(response, request)
+
+		assertStatus(t, response, http.StatusBadRequest)
+		assertHasError(t, response)
 	})
 }
 

@@ -3,6 +3,7 @@ package receipt
 import (
 	"errors"
 	"testing"
+	"time"
 )
 
 type stubRepository struct{}
@@ -16,6 +17,10 @@ func (m *stubRepository) Points(id string) (int64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+func (m *stubRepository) CreatePoints(points int64) string {
+	return "7fb1377b-b223-49d9-a31a-5a02701dd310"
 }
 
 func TestReceiptService_Points(t *testing.T) {
@@ -47,12 +52,20 @@ func TestReceiptService_Points(t *testing.T) {
 	})
 }
 
-func TestReceiptService_SetPoints(t *testing.T) {
+func TestReceiptService_Process(t *testing.T) {
 	mockRepo := &stubRepository{}
 	service := NewService(mockRepo)
 
 	t.Run("set points", func(t *testing.T) {
-		assertEqual(t, "ID", service.SetPoints(), "7fb1377b-b223-49d9-a31a-5a02701dd310")
+		receiptItems := []ReceiptItem{{"", 0}}
+		receipt := &Receipt{
+			Retailer:     "M&M 0-1",
+			PurchaseTime: time.Date(2024, time.December, 31, 13, 01, 0, 0, time.UTC),
+			Items:        receiptItems,
+			Total:        0,
+		}
+		got := service.Process(receipt)
+		assertEqual(t, "ID", got, "7fb1377b-b223-49d9-a31a-5a02701dd310")
 	})
 }
 

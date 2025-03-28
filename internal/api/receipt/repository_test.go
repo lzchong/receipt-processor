@@ -23,6 +23,18 @@ func TestReceiptRepository(t *testing.T) {
 		got, ok := repo.Points(id)
 		assertNoPoints(t, got, ok)
 	})
+
+	t.Run("create points", func(t *testing.T) {
+		points := int64(100)
+
+		id := repo.CreatePoints(points)
+		if id == "" {
+			t.Fatal("expected ID, but got nothing")
+		}
+
+		got := repo.(*inMemoryRepository).points[id]
+		assertPoints(t, got, true, points)
+	})
 }
 
 func assertPoints(t *testing.T, got int64, ok bool, want int64) {

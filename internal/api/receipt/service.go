@@ -6,7 +6,7 @@ import (
 
 type Service interface {
 	Points(id string) (int64, error)
-	SetPoints() string
+	Process(receipt *Receipt) string
 }
 
 type serviceImpl struct {
@@ -27,6 +27,8 @@ func (s *serviceImpl) Points(id string) (int64, error) {
 	return points, nil
 }
 
-func (s *serviceImpl) SetPoints() string {
-	return "7fb1377b-b223-49d9-a31a-5a02701dd310"
+func (s *serviceImpl) Process(receipt *Receipt) string {
+	points := receipt.CalculatePoints()
+	id := s.repository.CreatePoints(points)
+	return id
 }
