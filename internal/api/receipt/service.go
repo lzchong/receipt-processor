@@ -1,18 +1,30 @@
 package receipt
 
+import (
+	"errors"
+)
+
 type Service interface {
-	Points(id string) int64
+	Points(id string) (int64, error)
 	SetPoints() string
 }
 
-type serviceImpl struct{}
-
-func NewService() Service {
-	return &serviceImpl{}
+type serviceImpl struct {
+	repository Repository
 }
 
-func (s *serviceImpl) Points(id string) int64 {
-	return 32
+func NewService(repository Repository) Service {
+	return &serviceImpl{repository}
+}
+
+var ErrReceiptNotFound = errors.New("receipt not found")
+
+func (s *serviceImpl) Points(id string) (int64, error) {
+	points, ok := s.repository.Points(id)
+	if !ok {
+		return 0, ErrReceiptNotFound
+	}
+	return points, nil
 }
 
 func (s *serviceImpl) SetPoints() string {

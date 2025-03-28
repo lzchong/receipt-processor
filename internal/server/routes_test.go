@@ -6,8 +6,19 @@ import (
 	"testing"
 )
 
+type stubHandler struct{}
+
+func (h *stubHandler) Points(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *stubHandler) Process(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusAccepted)
+}
+
 func TestRouter(t *testing.T) {
-	router := NewRouter()
+	handler := &stubHandler{}
+	router := NewRouter(handler)
 
 	testCases := map[string]struct {
 		method string
@@ -33,14 +44,14 @@ func TestRouter(t *testing.T) {
 			response := httptest.NewRecorder()
 			router.ServeHTTP(response, request)
 
-			assertStatus(t, response.Code, tc.want)
+			assertStatus(t, response, tc.want)
 		})
 	}
 }
 
-func assertStatus(t *testing.T, got, want int) {
+func assertStatus(t *testing.T, response *httptest.ResponseRecorder, want int) {
 	t.Helper()
-	if got != want {
+	if got := response.Code; got != want {
 		t.Errorf("expected status %d, but got %d", want, got)
 	}
 }
