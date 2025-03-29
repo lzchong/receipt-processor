@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 type stubService struct{}
@@ -79,6 +80,18 @@ func TestReceiptHandler_Points(t *testing.T) {
 		assertHasError(t, response)
 	})
 
+	t.Run("whitespace ID", func(t *testing.T) {
+		request, err := http.NewRequest("GET", "/receipts/%20/points", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response := httptest.NewRecorder()
+		mux.ServeHTTP(response, request)
+
+		assertStatus(t, response, http.StatusBadRequest)
+		assertHasError(t, response)
+	})
+
 	t.Run("empty ID", func(t *testing.T) {
 		request, err := http.NewRequest("GET", "/receipts//points", nil)
 		if err != nil {
@@ -91,7 +104,7 @@ func TestReceiptHandler_Points(t *testing.T) {
 	})
 }
 
-func TestReceiptHandler_ItemRequestValidation(t *testing.T) {
+func TestItemRequestValidate(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		receiptItem := &ItemRequest{"Mountain Dew 12PK", "6.49"}
 		err := receiptItem.Validate()
@@ -116,8 +129,8 @@ func TestReceiptHandler_ItemRequestValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("price lower than zero", func(t *testing.T) {
-		receiptItem := &ItemRequest{"Mountain Dew 12PK", "-1"}
+	t.Run("price is a negative number", func(t *testing.T) {
+		receiptItem := &ItemRequest{"Mountain Dew 12PK", "-6.49"}
 		err := receiptItem.Validate()
 		if err == nil {
 			t.Error("expected has error, but got nothing")
@@ -131,9 +144,44 @@ func TestReceiptHandler_ItemRequestValidation(t *testing.T) {
 			t.Error("expected has error, but got nothing")
 		}
 	})
+
+	t.Run("price is not a number", func(t *testing.T) {
+		receiptItem := &ItemRequest{"Mountain Dew 12PK", "price"}
+		err := receiptItem.Validate()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+	})
 }
 
-func TestReceiptHandler_ProcessRequestValidation(t *testing.T) {
+func TestItemRequestToReceiptItem(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		dto := &ItemRequest{"Mountain Dew 12PK", "6.49"}
+		item, err := dto.ToReceiptItem()
+		if err != nil {
+			t.Errorf("expected no error, but got %v", err)
+		}
+		if got, want := item.ShortDescription, dto.ShortDescription; got != want {
+			t.Errorf("expected short description %s, but got %s", want, got)
+		}
+		if got, want := item.Price, 6.49; got != want {
+			t.Errorf("expected total %f, but got %f", want, got)
+		}
+	})
+
+	t.Run("price is not a number", func(t *testing.T) {
+		dto := &ItemRequest{"Mountain Dew 12PK", "price"}
+		item, err := dto.ToReceiptItem()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+		if item != nil {
+			t.Errorf("expected no receipt item, but got %v", item)
+		}
+	})
+}
+
+func TestProcessRequestValidate(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		receipt := &ProcessRequest{
 			Retailer:     "Target",
@@ -151,6 +199,20 @@ func TestReceiptHandler_ProcessRequestValidation(t *testing.T) {
 	t.Run("empty retailer", func(t *testing.T) {
 		receipt := &ProcessRequest{
 			Retailer:     "",
+			PurchaseDate: "2022-01-01",
+			PurchaseTime: "13:01",
+			Items:        []ItemRequest{{"Mountain Dew 12PK", "6.49"}},
+			Total:        "35.35",
+		}
+		err := receipt.Validate()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+	})
+
+	t.Run("invalid retailer", func(t *testing.T) {
+		receipt := &ProcessRequest{
+			Retailer:     "T@rget",
 			PurchaseDate: "2022-01-01",
 			PurchaseTime: "13:01",
 			Items:        []ItemRequest{{"Mountain Dew 12PK", "6.49"}},
@@ -246,13 +308,13 @@ func TestReceiptHandler_ProcessRequestValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("total lower than zero", func(t *testing.T) {
+	t.Run("total is a negative number", func(t *testing.T) {
 		receipt := &ProcessRequest{
 			Retailer:     "Target",
 			PurchaseDate: "2022-01-01",
 			PurchaseTime: "13:01",
 			Items:        []ItemRequest{{"Mountain Dew 12PK", "6.49"}},
-			Total:        "-1",
+			Total:        "-35.35",
 		}
 		err := receipt.Validate()
 		if err == nil {
@@ -271,6 +333,150 @@ func TestReceiptHandler_ProcessRequestValidation(t *testing.T) {
 		err := receipt.Validate()
 		if err == nil {
 			t.Error("expected has error, but got nothing")
+		}
+	})
+
+	t.Run("total is not a number", func(t *testing.T) {
+		receipt := &ProcessRequest{
+			Retailer:     "Target",
+			PurchaseDate: "2022-01-01",
+			PurchaseTime: "13:01",
+			Items:        []ItemRequest{{"Mountain Dew 12PK", "6.49"}},
+			Total:        "total",
+		}
+		err := receipt.Validate()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+	})
+}
+
+func TestProcessRequestToReceipt(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		dto := &ProcessRequest{
+			Retailer:     "Target",
+			PurchaseDate: "2022-12-31",
+			PurchaseTime: "13:51",
+			Items:        []ItemRequest{{"Mountain Dew 12PK", "6.49"}},
+			Total:        "35.35",
+		}
+		receipt, err := dto.ToReceipt()
+		if err != nil {
+			t.Errorf("expected no error, but got %v", err)
+		}
+		if got, want := receipt.Retailer, dto.Retailer; got != want {
+			t.Errorf("expected retailer %s, but got %s", want, got)
+		}
+		if got, want := receipt.PurchaseTime, time.Date(2022, time.December, 31, 13, 51, 0, 0, time.UTC); got != want {
+			t.Errorf("expected purchase time %v, but got %v", want, got)
+		}
+		if got, want := receipt.Total, 35.35; got != want {
+			t.Errorf("expected total %f, but got %f", want, got)
+		}
+		if got, want := len(receipt.Items), len(dto.Items); got != want {
+			t.Fatalf("expected %d items, but got %d", want, got)
+		}
+	})
+
+	t.Run("empty purchase date", func(t *testing.T) {
+		dto := &ProcessRequest{
+			Retailer:     "Target",
+			PurchaseDate: "",
+			PurchaseTime: "13:01",
+			Items:        []ItemRequest{{"Mountain Dew 12PK", "6.49"}},
+			Total:        "35.35",
+		}
+		receipt, err := dto.ToReceipt()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+		if receipt != nil {
+			t.Errorf("expected no receipt, but got %v", receipt)
+		}
+	})
+
+	t.Run("invalid purchase date", func(t *testing.T) {
+		dto := &ProcessRequest{
+			Retailer:     "Target",
+			PurchaseDate: "01-01-2022",
+			PurchaseTime: "13:01",
+			Items:        []ItemRequest{{"Mountain Dew 12PK", "6.49"}},
+			Total:        "35.35",
+		}
+		receipt, err := dto.ToReceipt()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+		if receipt != nil {
+			t.Errorf("expected no receipt, but got %v", receipt)
+		}
+	})
+
+	t.Run("empty purchase time", func(t *testing.T) {
+		dto := &ProcessRequest{
+			Retailer:     "Target",
+			PurchaseDate: "2022-01-01",
+			PurchaseTime: "",
+			Items:        []ItemRequest{{"Mountain Dew 12PK", "6.49"}},
+			Total:        "35.35",
+		}
+		receipt, err := dto.ToReceipt()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+		if receipt != nil {
+			t.Errorf("expected no receipt, but got %v", receipt)
+		}
+	})
+
+	t.Run("invalid purchase time", func(t *testing.T) {
+		dto := &ProcessRequest{
+			Retailer:     "Target",
+			PurchaseDate: "2022-01-01",
+			PurchaseTime: "13:01:32",
+			Items:        []ItemRequest{{"Mountain Dew 12PK", "6.49"}},
+			Total:        "35.35",
+		}
+		receipt, err := dto.ToReceipt()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+		if receipt != nil {
+			t.Errorf("expected no receipt, but got %v", receipt)
+		}
+	})
+
+	t.Run("invalid item", func(t *testing.T) {
+		dto := &ProcessRequest{
+			Retailer:     "Target",
+			PurchaseDate: "2022-01-01",
+			PurchaseTime: "13:01",
+			Items:        []ItemRequest{{"Mountain Dew 12PK", "price"}},
+			Total:        "total",
+		}
+		item, err := dto.ToReceipt()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+		if item != nil {
+			t.Errorf("expected no receipt item, but got %v", item)
+		}
+	})
+
+	t.Run("total is not a number", func(t *testing.T) {
+		dto := &ProcessRequest{
+			Retailer:     "Target",
+			PurchaseDate: "2022-01-01",
+			PurchaseTime: "13:01",
+			Items:        []ItemRequest{{"Mountain Dew 12PK", "6.49"}},
+			Total:        "total",
+		}
+		receipt, err := dto.ToReceipt()
+		if err == nil {
+			t.Error("expected has error, but got nothing")
+		}
+		if receipt != nil {
+			t.Errorf("expected no receipt, but got %v", receipt)
 		}
 	})
 }

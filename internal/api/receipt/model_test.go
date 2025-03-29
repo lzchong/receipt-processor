@@ -9,7 +9,7 @@ func TestCalculatePoints(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		receipt := &Receipt{
 			Retailer:     "Target",
-			PurchaseTime: time.Date(2022, time.January, 1, 13, 01, 0, 0, time.UTC),
+			PurchaseTime: time.Date(2022, time.January, 1, 14, 01, 0, 0, time.UTC),
 			Items: []ReceiptItem{
 				{"Mountain Dew 12PK", 6.49},
 				{"Emils Cheese Pizza", 12.25},
@@ -20,7 +20,7 @@ func TestCalculatePoints(t *testing.T) {
 			Total: 35.35,
 		}
 
-		if got, want := receipt.CalculatePoints(), int64(28); got != want {
+		if got, want := receipt.CalculatePoints(), int64(38); got != want {
 			t.Errorf("expected points %v, but got %v", want, got)
 		}
 	})

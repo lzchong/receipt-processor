@@ -74,15 +74,20 @@ func (r *ItemRequest) Validate() error {
 	if !priceRegex.MatchString(r.Price) {
 		return fmt.Errorf("price must be a decimal number with two decimal places")
 	}
-	price, err := strconv.ParseFloat(r.Price, 64)
-	if err != nil {
-		return fmt.Errorf("failed to parse price to float64, %v", err)
-	}
-	if price < 0 {
-		return fmt.Errorf("price must be greater than or equal to zero")
-	}
 
 	return nil
+}
+
+func (r *ItemRequest) ToReceiptItem() (*ReceiptItem, error) {
+	price, err := strconv.ParseFloat(r.Price, 64)
+	if err != nil {
+		return nil, err
+	}
+	item := &ReceiptItem{
+		ShortDescription: r.ShortDescription,
+		Price:            price,
+	}
+	return item, nil
 }
 
 type ProcessRequest struct {
@@ -127,13 +132,6 @@ func (r *ProcessRequest) Validate() error {
 	if !priceRegex.MatchString(r.Total) {
 		return fmt.Errorf("total must be a decimal number with two decimal places")
 	}
-	total, err := strconv.ParseFloat(r.Total, 64)
-	if err != nil {
-		return fmt.Errorf("failed to parse total to float64, %v", err)
-	}
-	if total < 0 {
-		return fmt.Errorf("total must be greater than or equal to zero")
-	}
 
 	return nil
 }
@@ -141,19 +139,16 @@ func (r *ProcessRequest) Validate() error {
 func (r *ProcessRequest) ToReceipt() (*Receipt, error) {
 	purchaseTime, err := time.Parse(time.DateTime, fmt.Sprintf("%s %s:00", r.PurchaseDate, r.PurchaseTime))
 	if err != nil {
-		return nil, fmt.Errorf("invalid purchase time: %v", err)
+		return nil, err
 	}
 
 	items := make([]ReceiptItem, len(r.Items))
-	for i, item := range r.Items {
-		price, err := strconv.ParseFloat(item.Price, 64)
+	for i, itemRequest := range r.Items {
+		item, err := itemRequest.ToReceiptItem()
 		if err != nil {
 			return nil, err
 		}
-		items[i] = ReceiptItem{
-			ShortDescription: item.ShortDescription,
-			Price:            price,
-		}
+		items[i] = *item
 	}
 
 	total, err := strconv.ParseFloat(r.Total, 64)
@@ -199,7 +194,6 @@ func (h *handlerImpl) Process(w http.ResponseWriter, r *http.Request) {
 
 	receipt, err := dto.ToReceipt()
 	if err != nil {
-		fmt.Println(err)
 		http.Error(w, "The receipt is invalid.", http.StatusBadRequest)
 		return
 	}
